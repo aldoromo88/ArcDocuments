@@ -29,7 +29,7 @@ namespace ArcDocuments.Core.Test.UnitTests
             }, new User
             {
                 Email = "aldoromo88@gmail.com",
-                Name = "Aldo Romo",
+                UserName = "Aldo Romo",
                 Password = "123!@#"
             });
 

@@ -1,5 +1,7 @@
-﻿using ArcDocuments.Core.Applications.Security.Contracts;
+﻿using ArcDocuments.Core.Applications.Common;
+using ArcDocuments.Core.Applications.Security.Contracts;
 using ArcDocuments.Core.Applications.Security.Dtos;
+using ArcDocuments.Core.Configuration;
 using Nest;
 using System;
 using System.Collections.Generic;
@@ -7,19 +9,11 @@ using System.Linq;
 
 namespace ArcDocuments.Core.Applications.Security
 {
-    public class CompanyApp : ICompanyApp
+    public class CompanyApp :BaseApp, ICompanyApp
     {
-        private ElasticClient _client;
 
-        public ElasticClient Client => _client;
-
-        public CompanyApp()
+        public CompanyApp():base(Consts.SecurityIndexName)
         {
-            var node = new Uri("http://localhost:9200");
-            var settings = new ConnectionSettings(node);
-            settings.DefaultIndex("arc-documents");
-            settings.DisableDirectStreaming(true);
-            _client = new ElasticClient(settings);
         }
 
         public Guid CreateCompany(Company company, User user)
@@ -34,10 +28,10 @@ namespace ArcDocuments.Core.Applications.Security
 
             company.Id = Guid.NewGuid();
 
-            user.Id = Guid.NewGuid();
+            user.Id = Guid.NewGuid().ToString();
             user.IdCompany = company.Id;
 
-            var response = _client.Bulk(b => b
+            var response = Storage.Bulk(b => b
                 .Index<Company>(i => i.Document(company))
                 .Index<User>(i => i.Document(user))
             );
@@ -47,7 +41,7 @@ namespace ArcDocuments.Core.Applications.Security
 
         public void UpdateCompany(Company company)
         {
-            _client.Update<Company, object>(
+            Storage.Update<Company, object>(
                 new DocumentPath<Company>(company.Id),
                 u => u.Doc(new { company.Name }).RetryOnConflict(3)
                 );
@@ -55,7 +49,7 @@ namespace ArcDocuments.Core.Applications.Security
 
         public IReadOnlyCollection<IHit<Company>> SearchCompanies(string name)
         {
-            var companies = _client.Search<Company>(c => c.From(0).Size(10).Query(q => q.Term(t => t.Name, name)));
+            var companies = Storage.Search<Company>(c => c.From(0).Size(10).Query(q => q.Term(t => t.Name, name)));
             return companies.Hits;
         }
         
@@ -64,14 +58,14 @@ namespace ArcDocuments.Core.Applications.Security
         {
             var resultDeleteUsers = // _client.DeleteByQuery<User>(f => f.Query(q => q.Term(t => t.IdCompany, id)));
 
-            _client.DeleteByQuery<User>(f=>f.AllIndices().QueryOnQueryString($"idCompany:{id}").Refresh());
+            Storage.DeleteByQuery<User>(f=>f.AllIndices().QueryOnQueryString($"idCompany:{id}").Refresh());
 
-            var resultDeteleCompany = _client.Delete<Company>(id);
+            var resultDeteleCompany = Storage.Delete<Company>(id);
         }
 
         public Company GetComnpany(Guid id)
         {
-            var company = _client.Get<Company>(id);
+            var company = Storage.Get<Company>(id);
             return company.Source;
         }
     }
